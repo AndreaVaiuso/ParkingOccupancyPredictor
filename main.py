@@ -10,6 +10,8 @@ from keras.layers import LSTM
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
 import sys
+import os
+import calendar
 
 SECONDS_IN_WEEK = 604800
 SECONDS_IN_DAY = 86400
@@ -113,32 +115,20 @@ def padding(array,size=1):
         ar.append([array[i][0]])
     return ar
 
-if __name__ == "__main__":
+def integers_list(a, b):
+    return [i for i in range(a, b+1)]
+
+def compute(file,to=11,test_num=7):
     # L'ultima riga del file rappresenta il giorno e l'ora corrente (ultima misurazione effettuata)
-    df = ct.csv_open("DATASET/input.csv",sep=";")
-    weeks_number = 13
-    weeks_mean_number = 4
+    df = ct.csv_open("DATASET/"+file,sep=";")
+    weeks_train_number = 21
     look_back = 3
     # history_trend contiene i dati settimanali ordinati dal più recente al meno recente, dalle 00:00 alle 23:00
     # current_day_trend contiene i dati della settimana corrente da 00:00 all'ora corrente (ultima nel file csv)
     # current_weekday rappresenta il numero del giorno della settimana corrente (ultima nel file csv)
-    history_trend, current_day_trend, current_weekday = getTrends(df,weeks_number,look_back)
+    history_trend, current_day_trend, current_weekday = getTrends(df,weeks_train_number,look_back)
     
-    weights = generateWeights(weeks_mean_number)
     current_day_len = len(current_day_trend)
-    
-    # calculate weighted mean data
-    w_set = weightedMean(history_trend,weights)
-
-    showPlot = True
-    plt.xlim([0,23])
-    plt.ylim([0,1])
-    if showPlot:
-        for i in range(weeks_mean_number):
-            plt.plot(history_trend[i][look_back:len(history_trend[i])-look_back],label="current week "+str(-i))
-        plt.plot(w_set[look_back:len(w_set)-look_back],label="mean",linewidth=3)
-        plt.legend()
-        plt.show()
 
     # unisco in un solo vettore tutti i dati inerenti le settimane precedenti, rimuovendo il padding
     dataset = mergeData(history_trend,look_back)
@@ -157,19 +147,46 @@ if __name__ == "__main__":
     # create and fit the LSTM network
 
     model = Sequential()
-    try:
-        lmodel = sys.argv[1]
-    except IndexError:
-        lmodel = None
     model.add(LSTM(32, input_shape=(1, look_back)))
     model.add(Dense(1))
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='loss',patience=3,mode='min')
     model.compile(loss='mean_squared_error', optimizer='adam')
-    if lmodel == None:
+    net_file_name = "NETWORK/"+file+".keras"
+    if not os.path.isfile(net_file_name):
         model.fit(trainX, trainY, epochs=100, batch_size=1, verbose=2, callbacks=[early_stopping])
+        model.save(net_file_name)
     else:
-        model.load_weights("NETWORK/"+lmodel)
-
+        model.load_weights(net_file_name)
+    fr = 1
+    msemean = [0] * (to - fr)
+    for weeks_mean_number in range(fr,to):
+        weights = generateWeights(weeks_mean_number)
+        num = 0
+        for j in range(-1,-num-(test_num+1),-1):
+            n = len(history_trend)
+            w_set = weightedMean(history_trend[n+j-weeks_mean_number:n+j],weights)
+            pred_day = convertToColumn(history_trend[n+j-weeks_mean_number-1][look_back:len(history_trend[n+j-weeks_mean_number-1])-look_back])
+            w_set = convertToColumn(w_set)
+            testX, _ = create_dataset(w_set,look_back)
+            testX = numpy.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
+            n_prediction = model.predict(testX)
+            n_prediction = padding(n_prediction,look_back)
+            n_prediction = n_prediction[look_back:len(n_prediction)-look_back+1]
+            mse = math.sqrt(mean_squared_error(pred_day[0:len(pred_day)][0], n_prediction[0:len(n_prediction)][0]))
+            msemean[(weeks_mean_number - fr)] += mse
+            num += 1
+        print(weeks_mean_number," -> ", num)
+        msemean[(weeks_mean_number - fr)] /= num
+    print("Done")
+    for i in range(len(msemean)):
+        err = str(msemean[i])
+        print("MSE using " + str(i+1) + " weeks average:\t["+err+"]")
+    return msemean
+    """""
+    # calculate weighted mean data
+    weeks_mean_number = 4
+    weights = generateWeights(weeks_mean_number)
+    w_set = weightedMean(history_trend,weights)
     current_day_trend_col = convertToColumn(current_day_trend)
     w_set = convertToColumn(w_set)
     testX, _ = create_dataset(w_set,look_back)
@@ -177,6 +194,17 @@ if __name__ == "__main__":
     # make prediction
     n_prediction = model.predict(testX)
     n_prediction = padding(n_prediction,look_back)
+    n_prediction = n_prediction[look_back:len(n_prediction)-look_back+1]
+    # plot data
+    showPlot = False
+    plt.xlim([0,23])
+    plt.ylim([0,1])
+    if showPlot:
+        for i in range(weeks_mean_number):
+            plt.plot(history_trend[i][look_back:len(history_trend[i])-look_back],label="current week "+str(-i))
+        plt.plot(w_set[look_back:len(w_set)-look_back],label="mean",linewidth=3)
+        plt.legend()
+        plt.show()
 
     plt.plot(n_prediction[look_back:len(n_prediction)-look_back+1],label="prediction")
     plt.plot(w_set[look_back:len(w_set)-look_back],label="Weighted mean")
@@ -184,52 +212,27 @@ if __name__ == "__main__":
     
     plt.legend()
     plt.show()
-
-
     """""
-    time = 8
-    currentTimeTrend = current_day_trend[0:time]
-    for i in range(time,len(n_prediction)):
-        currentTimeTrend.append(n_prediction[i][0])
 
-    plt.plot(currentTimeTrend,label="prediction")
-    plt.plot(current_day_trend,label="ground truth")
+
+if __name__ == "__main__":
+    files = os.listdir("DATASET")
+    errors = []
+    files = sorted(files)
+    to = 8
+    for file in files:
+        if file.endswith(".csv"):
+            print("Using: "+file)
+            errors.append(compute(file,to,test_num=10))
+    #rows, cols = len(errors[0]),len(errors)
+    #erplot = [([0]*cols) for i in range(rows)]
+    #for i in range(len(errors)):
+    #    plt.plot(errors[i],label=calendar.day_abbr[i])
+    his = [0] * (to-1)
+    for i in range(len(errors)):
+        minVal = min(errors[i])
+        his[errors[i].index(minVal)] += 1
+    plt.bar(list(range(1,to)),his)
+    plt.xlim([0,to])
     plt.legend()
     plt.show()
-    """""
-
-    """""
-    head = []
-    period = 15
-    for i in range(period):
-        head.append(current_day_trend[i])
-    tail = history_trend[0]
-
-    prediction = tail + head
-
-    ts = convertToColumn(prediction)
-    testX, testY = create_dataset(ts,look_back)
-    testX = numpy.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
-    n_prediction = model.predict(testX)
-    print(padding(n_prediction,3))
-    plt.plot(padding(n_prediction,3),label="prediction")
-    plt.plot(prediction,label="ground truth")
-    plt.legend()
-    plt.show()
-    """""
-
-    """""
-    for i in range(period,len(current_day_trend)):
-        ts = convertToColumn(prediction)
-        testX, testY = create_dataset(ts,look_back)
-        testX = numpy.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
-        n_prediction = model.predict(testX)
-        print(n_prediction)
-        print()
-        prediction.append(n_prediction[-1][0])
-    plt.plot(prediction[len(tail):len(prediction)],label="prediction")
-    plt.plot(current_day_trend,label="ground truth")
-    plt.legend()
-    plt.show()
-    """""
-
