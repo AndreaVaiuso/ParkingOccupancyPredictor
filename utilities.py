@@ -52,7 +52,12 @@ def toBool(val):
   if val == "0" or val.lower() == "false" or val.lower() == "n" or val.lower() == "no" or val.lower() == "f": return 0
   return -1
 
-def secToTime(n):
+def formatTime(time):
+  if int(time) < 10:
+    return "0"+str(time)
+  return str(time)
+
+def secToTime(n,clockFormat=False):
     day = n // (24 * 3600)
     n = n % (24 * 3600)
     hour = n // 3600
@@ -60,7 +65,8 @@ def secToTime(n):
     minutes = n // 60
     n %= 60
     seconds = math.ceil(n)
-    return str(math.ceil(day))+"d:"+str(math.ceil(hour))+"h:"+str(math.ceil(minutes))+"m:"+str(seconds)+"s"
+    if clockFormat: return formatTime(math.ceil(hour)) + ":" + formatTime(math.ceil(minutes))
+    return formatTime(math.ceil(day))+"d:"+formatTime(math.ceil(hour))+"h:"+formatTime(math.ceil(minutes))+"m:"+formatTime(seconds)+"s"
 
 def imgpad(im,h,w):
   old_size = im.shape[:2] # old_size is in (height, width) format

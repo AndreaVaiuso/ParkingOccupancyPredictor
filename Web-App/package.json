@@ -1,0 +1,15 @@
+{
+  "name": "pop",
+  "version": "1.0.0",
+  "description": "PoP is the Parking occupancy Predictor: a predictor based on a neural network for predicting parking occupancy",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "author": "Andrea Vaiuso",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.17.2"
+  }
+}

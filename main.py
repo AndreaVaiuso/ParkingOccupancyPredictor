@@ -1,6 +1,6 @@
 import numpy
 import matplotlib.pyplot as plt
-from pandas import read_csv
+from utilities import bcolors, secToTime
 import math
 import csvtools as ct
 import tensorflow as tf
@@ -12,9 +12,22 @@ from sklearn.metrics import mean_squared_error
 import sys
 import os
 import calendar
+import json
 
 SECONDS_IN_WEEK = 604800
 SECONDS_IN_DAY = 86400
+SAMPLING_TIME = 3600
+
+DEBUG = True
+
+def debug(string):
+    if DEBUG: 
+        print(bcolors.WARNING+"---DEBUG----"+bcolors.ENDC)
+        print(bcolors.WARNING+str(string)+bcolors.ENDC)
+        print(bcolors.WARNING+"------------"+bcolors.ENDC)
+
+def to_lstm_input_shape(data):
+    return numpy.reshape(data, (data.shape[0], 1, data.shape[1]))
 
 def create_dataset(dataset, look_back=1):
 	dataX, dataY = [], []
@@ -24,38 +37,41 @@ def create_dataset(dataset, look_back=1):
 		dataY.append(dataset[i + look_back,0])
 	return numpy.array(dataX), numpy.array(dataY)
 
-def getTrends(data_frame,weeks_number,look_back,samplingTime=3600,label_column="TOTAL_OCCUPIED_RATIO"):
+def printRow(data):
+    print(data['DATE'],data['WEEKDAY'],data['HOUR_OF_THE_DAY'],data['TOTAL_OCCUPIED_RATIO'])
+
+def getTrends(data_frame,weeks_number,week_day,look_back=0,samplingTime=3600,label_column="TOTAL_OCCUPIED_RATIO"):
     i = -1
+    week_day = str(week_day)
     last_day = data_frame[i]["WEEKDAY"]
-    last_day_trend = [float(data_frame[i][label_column])]
-    while i>-len(data_frame):
-        i-=1
-        if data_frame[i]["WEEKDAY"]==last_day:
-            last_day_trend.append(float(data_frame[i][label_column]))
-        else:
-            i += 1
-            break
+    if week_day==last_day:
+        i -= int(SECONDS_IN_WEEK / samplingTime) - int(SECONDS_IN_DAY/samplingTime)
+    else:
+        while True:
+            i -= 1
+            if data_frame[i]["WEEKDAY"] == week_day:
+                break
     trend = []
     stop = False
     for week in range(weeks_number):
-        trend.append([])
-        i -= int(SECONDS_IN_WEEK / samplingTime) - int(SECONDS_IN_DAY/samplingTime)
-        fr = (i-1) + look_back
-        to = (i-int(SECONDS_IN_DAY/samplingTime)-1) - look_back
+        fr = i + look_back
+        to = i - int(SECONDS_IN_DAY/samplingTime) - look_back - 1
+        temp_tr = []
         for j in range(fr,to,-1):
             try:
-                trend[week].append(float(data_frame[j][label_column]))
+                temp_tr.append(float(data_frame[j][label_column]))
             except IndexError:
-                print("Reached maximum week limit. Data truncated at value: "+str(j))
+                print("Reached maximum week limit. Data truncated at value: "+str(week))
                 stop = True
                 break
-        trend[week].reverse()
-        i -= int(SECONDS_IN_DAY/samplingTime)
         if stop: break
-    last_day_trend.reverse()
-    return trend, last_day_trend, last_day
+        trend.append(temp_tr)
+        trend[-1].reverse()
+        i -= int(SECONDS_IN_DAY/samplingTime)
+        i -= int(SECONDS_IN_WEEK / samplingTime) - int(SECONDS_IN_DAY/samplingTime)
+    return trend
 
-def mergeData(trend,look_back):
+def mergeData(trend,look_back=0):
     data = []
     for i in range(len(trend)):
         for j in range(look_back,len(trend[i])-look_back):
@@ -118,121 +134,132 @@ def padding(array,size=1):
 def integers_list(a, b):
     return [i for i in range(a, b+1)]
 
-def compute(file,to=11,test_num=7):
-    # L'ultima riga del file rappresenta il giorno e l'ora corrente (ultima misurazione effettuata)
-    df = ct.csv_open("DATASET/"+file,sep=";")
-    weeks_train_number = 21
-    look_back = 3
-    # history_trend contiene i dati settimanali ordinati dal più recente al meno recente, dalle 00:00 alle 23:00
-    # current_day_trend contiene i dati della settimana corrente da 00:00 all'ora corrente (ultima nel file csv)
-    # current_weekday rappresenta il numero del giorno della settimana corrente (ultima nel file csv)
-    history_trend, current_day_trend, current_weekday = getTrends(df,weeks_train_number,look_back)
-    
-    current_day_len = len(current_day_trend)
+def normalize(arr, t_min, t_max):
+    norm_arr = []
+    diff = t_max - t_min
+    diff_arr = max(arr) - min(arr)   
+    for i in arr:
+        temp = (((i - min(arr))*diff)/diff_arr) + t_min
+        norm_arr.append(temp)
+    return norm_arr
 
-    # unisco in un solo vettore tutti i dati inerenti le settimane precedenti, rimuovendo il padding
-    dataset = mergeData(history_trend,look_back)
-    # preparo training set e validation set
-    train, valid = splitData(dataset,0.7)
-    # converto nel formato compatibile di TensorFlow
-    train = convertToColumn(train)
-    valid = convertToColumn(valid)
-    dataset = convertToColumn(dataset)
-    # reshape into X=t and Y=t+1
-    trainX, trainY = create_dataset(train, look_back)
-    validX, validY = create_dataset(valid, look_back)
-    # reshape input to be [samples, time steps, features], compatible with LSTM input format
-    trainX = numpy.reshape(trainX, (trainX.shape[0], 1, trainX.shape[1]))
-    validX = numpy.reshape(validX, (validX.shape[0], 1, validX.shape[1]))
-    # create and fit the LSTM network
-
+def create_lstm(look_back):
     model = Sequential()
     model.add(LSTM(32, input_shape=(1, look_back)))
     model.add(Dense(1))
-    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='loss',patience=3,mode='min')
+    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',patience=3,mode='min')
     model.compile(loss='mean_squared_error', optimizer='adam')
-    net_file_name = "NETWORK/"+file+".keras"
-    if not os.path.isfile(net_file_name):
-        model.fit(trainX, trainY, epochs=100, batch_size=1, verbose=2, callbacks=[early_stopping])
-        model.save(net_file_name)
-    else:
-        model.load_weights(net_file_name)
-    fr = 1
-    msemean = [0] * (to - fr)
-    for weeks_mean_number in range(fr,to):
-        weights = generateWeights(weeks_mean_number)
-        num = 0
-        for j in range(-1,-num-(test_num+1),-1):
-            n = len(history_trend)
-            w_set = weightedMean(history_trend[n+j-weeks_mean_number:n+j],weights)
-            pred_day = convertToColumn(history_trend[n+j-weeks_mean_number-1][look_back:len(history_trend[n+j-weeks_mean_number-1])-look_back])
-            w_set = convertToColumn(w_set)
-            testX, _ = create_dataset(w_set,look_back)
-            testX = numpy.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
-            n_prediction = model.predict(testX)
-            n_prediction = padding(n_prediction,look_back)
-            n_prediction = n_prediction[look_back:len(n_prediction)-look_back+1]
-            mse = math.sqrt(mean_squared_error(pred_day[0:len(pred_day)][0], n_prediction[0:len(n_prediction)][0]))
-            msemean[(weeks_mean_number - fr)] += mse
-            num += 1
-        print(weeks_mean_number," -> ", num)
-        msemean[(weeks_mean_number - fr)] /= num
-    print("Done")
-    for i in range(len(msemean)):
-        err = str(msemean[i])
-        print("MSE using " + str(i+1) + " weeks average:\t["+err+"]")
-    return msemean
-    """""
-    # calculate weighted mean data
-    weeks_mean_number = 4
+    return model, early_stopping
+
+def do_train(history_trend,week_day,look_back):
+    train = mergeData(history_trend,look_back)
+    train = convertToColumn(train)
+    trainX, trainY = create_dataset(train,look_back)
+    trainX = numpy.reshape(trainX, (trainX.shape[0], 1, trainX.shape[1]))
+    model, early_stopping = create_lstm(look_back)
+    model_f_name = "NETWORK/"+calendar.day_abbr[week_day]+".keras"
+    model.fit(trainX, trainY, validation_split=0.3, epochs=100, batch_size=1, verbose=2, callbacks=[early_stopping])
+    model.save(model_f_name)
+    return model
+
+def load_model(week_day,look_back):
+    model_f_name = "NETWORK/"+calendar.day_abbr[week_day]+".keras"
+    model, _ = create_lstm(look_back)
+    try:
+        model.load_weights(model_f_name)
+    except:
+        print("Error while loading weights for the model: " + model_f_name)
+        return None
+    return model
+
+def generate_models_array(df,weeks_train_number,look_back):
+    models = []
+    trends = []
+    for week_day in range(7):
+        history_trend = getTrends(df,weeks_train_number,week_day,look_back)
+        model = load_model(week_day,look_back)
+        if model is None:
+            model = do_train(history_trend,week_day,look_back)
+        models.append(model)
+        trends.append(history_trend)
+    return models, trends
+
+def generate_model(df,weeks_train_number,week_day,look_back,force_train=False):
+    history_trend = getTrends(df,weeks_train_number,week_day,look_back,samplingTime=SAMPLING_TIME)
+    model = None
+    if force_train:
+        model = do_train(history_trend,week_day,look_back)
+        return model, history_trend
+    model = load_model(week_day,look_back)
+    if model is None:
+        model = do_train(history_trend,week_day,look_back)
+    return model, history_trend
+
+def predict(model,trend_array,weeks_mean_number,look_back,weeks_shift=0,ground_truth=None):
     weights = generateWeights(weeks_mean_number)
-    w_set = weightedMean(history_trend,weights)
-    current_day_trend_col = convertToColumn(current_day_trend)
-    w_set = convertToColumn(w_set)
-    testX, _ = create_dataset(w_set,look_back)
-    testX = numpy.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
-    # make prediction
-    n_prediction = model.predict(testX)
-    n_prediction = padding(n_prediction,look_back)
-    n_prediction = n_prediction[look_back:len(n_prediction)-look_back+1]
-    # plot data
-    showPlot = False
+    trend = trend_array
+    mse = numpy.nan
+    n_prediction = []
+    for i in range(weeks_shift+1):
+        n = len(trend)
+        w_set = weightedMean(trend[n-weeks_mean_number:n],weights)
+        pad_head = w_set[0:look_back]
+        pad_teal = w_set[-1]
+        w_set = convertToColumn(w_set)
+        testX, _ = create_dataset(w_set,look_back)
+        testX = numpy.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
+        n_prediction = model.predict(testX)
+        n_prediction = padding(n_prediction,look_back)
+        for i in range(len(n_prediction)):
+            val = n_prediction[i][0]
+            if not numpy.isnan(val):
+                pad_head.append(val)
+        pad_head.append(pad_teal)
+        trend.append(pad_head)
+    prediction = n_prediction[look_back:len(n_prediction)-look_back+1]
+    if ground_truth is not None:
+        ground_truth = convertToColumn(ground_truth)
+        mse = math.sqrt(mean_squared_error(ground_truth[0:len(ground_truth)][0], n_prediction[0:len(n_prediction)][0]))
+    return prediction, mse
+
+def prepare():
+    df = ct.csv_open("DATASET/input.csv",sep=";")
+    look_back = 3
+    weeks_train_number = 21
+    models, trends = generate_models_array(df,weeks_train_number,look_back=look_back)
+    return models, trends, look_back
+
+
+def main(week_day):
+    df = ct.csv_open("DATASET/input.csv",sep=";")
+    weeks_train_number = 21
+    look_back = 3
+    model,trend = generate_model(df,weeks_train_number,week_day=week_day,look_back=look_back)
     plt.xlim([0,23])
     plt.ylim([0,1])
-    if showPlot:
-        for i in range(weeks_mean_number):
-            plt.plot(history_trend[i][look_back:len(history_trend[i])-look_back],label="current week "+str(-i))
-        plt.plot(w_set[look_back:len(w_set)-look_back],label="mean",linewidth=3)
-        plt.legend()
-        plt.show()
-
-    plt.plot(n_prediction[look_back:len(n_prediction)-look_back+1],label="prediction")
-    plt.plot(w_set[look_back:len(w_set)-look_back],label="Weighted mean")
-    plt.plot(current_day_trend_col,label="ground truth")
-    
+    for i in range(4):
+        plt.plot(trend[i][look_back:len(trend[i])-look_back])
+    plt.show(block=False)
+    plt.pause(2)
+    plt.close()
+    prediction, mse = predict(model,trend,weeks_mean_number=4,look_back=look_back)
+    pr = []
+    for pred in prediction:
+        pr.append(pred[0])
+    out = {}
+    t = 0
+    for pred in pr:
+        out[secToTime(t,clockFormat=True)] = str(pred)
+        t += SAMPLING_TIME
+    json_object = json.dumps(out, indent = 4)
+    plt.xlim([0,23])
+    plt.ylim([0,1])
+    plt.plot(prediction,label="prediction")
     plt.legend()
-    plt.show()
-    """""
-
+    plt.show(block=False)
+    plt.pause(2)
+    plt.close() 
 
 if __name__ == "__main__":
-    files = os.listdir("DATASET")
-    errors = []
-    files = sorted(files)
-    to = 8
-    for file in files:
-        if file.endswith(".csv"):
-            print("Using: "+file)
-            errors.append(compute(file,to,test_num=10))
-    #rows, cols = len(errors[0]),len(errors)
-    #erplot = [([0]*cols) for i in range(rows)]
-    #for i in range(len(errors)):
-    #    plt.plot(errors[i],label=calendar.day_abbr[i])
-    his = [0] * (to-1)
-    for i in range(len(errors)):
-        minVal = min(errors[i])
-        his[errors[i].index(minVal)] += 1
-    plt.bar(list(range(1,to)),his)
-    plt.xlim([0,to])
-    plt.legend()
-    plt.show()
+    for i in range(7):
+        main(i)
