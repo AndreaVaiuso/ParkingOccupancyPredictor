@@ -17,6 +17,8 @@ import json
 SECONDS_IN_WEEK = 604800
 SECONDS_IN_DAY = 86400
 SAMPLING_TIME = 3600
+LOOK_BACK = 3
+WEEKS_MEAN_NUMBER = 4
 
 DEBUG = True
 
@@ -195,7 +197,7 @@ def generate_model(df,weeks_train_number,week_day,look_back,force_train=False):
         model = do_train(history_trend,week_day,look_back)
     return model, history_trend
 
-def predict(model,trend_array,weeks_mean_number,look_back,weeks_shift=0,ground_truth=None):
+def predict(model,trend_array,weeks_mean_number=WEEKS_MEAN_NUMBER,look_back=LOOK_BACK,weeks_shift=0,ground_truth=None):
     weights = generateWeights(weeks_mean_number)
     trend = trend_array
     mse = numpy.nan
@@ -222,12 +224,11 @@ def predict(model,trend_array,weeks_mean_number,look_back,weeks_shift=0,ground_t
         mse = math.sqrt(mean_squared_error(ground_truth[0:len(ground_truth)][0], n_prediction[0:len(n_prediction)][0]))
     return prediction, mse
 
-def prepare():
+def prepare(week_day):
     df = ct.csv_open("DATASET/input.csv",sep=";")
-    look_back = 3
     weeks_train_number = 21
-    models, trends = generate_models_array(df,weeks_train_number,look_back=look_back)
-    return models, trends, look_back
+    model, trend = generate_model(df,weeks_train_number,week_day=week_day,look_back=LOOK_BACK)
+    return model, trend
 
 
 def main(week_day):

@@ -12,12 +12,6 @@ class Req(BaseModel):
     WEEK_DAY: float
     WEEK_SHIFT: float
 
-models = []
-trends = []
-look_back = 3
-weeks_mean_number = 4
-loaded = False
-
 app = FastAPI()
 
 app.add_middleware(
@@ -27,14 +21,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.get("/load")
-def read_root():
-    global models, trends, look_back, loaded
-    if not loaded:
-        models, trends, look_back = prepare()
-        loaded = True
-    return {"status": "ok"}
 
 @app.get("/current")
 def read_current():
@@ -55,14 +41,13 @@ def read_current():
 @app.post("/predict")
 async def create_item(item: Req):
     global models, trends, look_back
-    if not loaded:
-        read_root()
     index = int(item.WEEK_DAY)
     week_shift = int(item.WEEK_SHIFT)
     if index not in range(7):
         return json.dumps({"status": "failed"})
     print("Request: ",index," Week_shift: ",week_shift)
-    prediction, _ = predict(models[index],trends[index],weeks_mean_number=weeks_mean_number,weeks_shift=week_shift,look_back=look_back)
+    model,trend = prepare(index) 
+    prediction, _ = predict(model,trend,weeks_shift=week_shift)
     pr = []
     for pred in prediction:
         pr.append(pred[0])

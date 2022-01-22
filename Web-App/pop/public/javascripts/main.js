@@ -11,11 +11,12 @@ wday = 0
 day_shift = 0
 week_shift = 0
 last_update = document.getElementById("last_update")
-today = true
 current_day = document.getElementById("current_day")
 chart = document.getElementById("chart")
 
+
 function current(){
+    document.getElementById("back_button").disabled = true
     $.ajax({
         url: addr+'/current',
         type: 'GET',
@@ -36,46 +37,68 @@ function current(){
             current_date = (Number.parseInt(x[2])+2000) + "-" + x[1] + "-" + x[0]
             current_date = Date.parse(current_date)
             last_update.innerHTML=current_data["DATE"] + " - " + time
-            rq = { "WEEK_DAY": wday, "WEEK_SHIFT": 0}
-            $.ajax({
-                url: addr+'/predict',
-                type: 'POST',
-                dataType: "json",
-                contentType: "application/json; charset=utf-8",
-                data: JSON.stringify(rq),
-                responseType:'json',
-                crossDomain: true,
-                success: function(response) {
-                    predicted_today = $.parseJSON(response)
-                    end = Number.parseInt((3600) / SAMPLING_TIME) * 23
-                    x = time.split(":")
-                    idx = Number.parseInt(x[0])
-                    for(i=idx+1;i<=end;i++){
-                        r = ""
-                        if(i<10) r = "0"+i+":00"
-                        else r = i+":00"
-                        current_data[r] = predicted_today[r]
-                    }
-                    colors = []
-                    c2 = Object.keys(current_data).length
-                    c2 -= 3
-                    for(i=0;i<c2;i++){
-                        if(i<idx+1) colors.push("red")
-                        else colors.push("blue")
-                    }
-                    updateChart(colors)
-                },
-                error: function(xhr, status){
-                    alert(status);
-                }
-            })
-            
+            postPrediction({ "WEEK_DAY": wday, "WEEK_SHIFT": 0})
         },
         error: function (xhr, status) {
             alert(status);
         }
     });
 }
+
+function postPrediction(request){
+    today = (day_shift == 0 && week_shift == 0)
+    if(today){
+        document.getElementById("back_button").disabled = true
+    } else {
+        document.getElementById("back_button").disabled = false
+    }
+    $.ajax({
+        url: addr+'/predict',
+        type: 'POST',
+        dataType: "json",
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify(request),
+        responseType:'json',
+        crossDomain: true,
+        success: function(response) {
+            if(today){
+                predicted_today = $.parseJSON(response)
+                end = Number.parseInt((3600) / SAMPLING_TIME) * 23
+                x = time.split(":")
+                idx = Number.parseInt(x[0])
+                for(i=idx+1;i<=end;i++){
+                    r = ""
+                    if(i<10) r = "0"+i+":00"
+                    else r = i+":00"
+                    current_data[r] = predicted_today[r]
+                }
+                colors = []
+                c2 = Object.keys(current_data).length
+                c2 -= 3
+                for(i=0;i<c2;i++){
+                    if(i<idx+1) colors.push("#f25a5a")
+                    else colors.push("#4f73df")
+                }
+                updateChart(colors)
+            } else {
+                current_data = $.parseJSON(response)
+                updateChart()
+            }
+        },
+        error: function (xhr, status) {
+            alert(status);
+        }
+    });
+}
+
+$("#today_button").click(function(e) {
+    current()
+    day_shift = 0
+    current_date = addDays(current_date,-wday)
+    wday = 0
+    current_day.innerHTML = "TODAY"
+    document.getElementById("back_button").disabled = true
+});
 
 $("#back_button").click(function(e) {
     e.preventDefault()
@@ -92,29 +115,9 @@ $("#back_button").click(function(e) {
         day_shift -= 1
         current_date = addDays(current_date,-1)
         current_day.innerHTML = current_date.getDate() + "/" + (current_date.getMonth() + 1) + "/" + current_date.getFullYear()
-        rq = { "WEEK_DAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7)}
-        $.ajax({
-            url: addr+'/predict',
-            type: 'POST',
-            dataType: "json",
-            contentType: "application/json; charset=utf-8",
-            data: JSON.stringify(rq),
-            responseType:'json',
-            crossDomain: true,
-            success: function(response) {
-                current_data = $.parseJSON(response)
-                updateChart()
-            },
-            error: function (xhr, status) {
-                alert(status);
-            }
-        });
+        postPrediction({ "WEEK_DAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7)})
     }
 });
-
-if(today){
-    document.getElementById("back_button").disabled = true
-}
 
 $("#next_button").click(function(e) {
     if(day_shift==30){
@@ -125,25 +128,9 @@ $("#next_button").click(function(e) {
     current_date = addDays(current_date,1)
     current_day.innerHTML = current_date.getDate() + "/" + (current_date.getMonth() + 1) + "/" + current_date.getFullYear()
     document.getElementById("back_button").disabled = false
-    rq = { "WEEK_DAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7)}
-    e.preventDefault();
-    $.ajax({
-        url: addr+'/predict',
-        type: 'POST',
-        dataType: "json",
-        contentType: "application/json; charset=utf-8",
-        data: JSON.stringify(rq),
-        responseType:'json',
-        crossDomain: true,
-        success: function(response) {
-            current_data = $.parseJSON(response)
-            updateChart()
-        },
-        error: function (xhr, status) {
-            alert(status);
-        }
-    });
+    postPrediction({ "WEEK_DAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7)})
 });
+
 current()
 
 var lx = [];
@@ -153,7 +140,6 @@ for(i=0;i<24;i++){
     hour = h+":00"
     lx.push(hour)
 }
-
 
 var ctx = document.getElementById("chart_data");
 var barChart = new Chart(ctx, {
@@ -167,13 +153,16 @@ var barChart = new Chart(ctx, {
         }]
     },
     options: {
+        legend: {
+            display: false
+        },
         scales: {
             yAxes: [{
                 ticks: {
                     beginAtZero: true,
                     min: 0,
                     max: 1,
-                    stepSize: 0.5,
+                    stepSize: 0.25,
                 }
             }]
         }
@@ -190,7 +179,7 @@ function updateChart(colors){
         h = i;
         if(h<10) h = "0" + i
         hour = h+":00"
-        if(typeof colors == 'undefined') cx.push("blue")
+        if(typeof colors == 'undefined') cx.push("#4f73df")
         x = Number.parseFloat(current_data[hour])
         dat.push(x)
     }

@@ -44,13 +44,30 @@
                         <div class="text-dark font-weight-bold h5 mb-0"><span></span></div>
                     </div>
                     <div class="col-auto">
-                        <div class="btn-group" role="group"><button class="btn btn-primary" id="back_button" type="button"><i class="material-icons">arrow_back</i></button><button class="btn btn-primary" id="next_button" type="button"><i class="material-icons">arrow_forward</i></button></div>
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-primary" id="back_button" type="button">
+                                <i class="material-icons">arrow_back</i>
+                            </button>
+                            <button class="btn btn-primary" id="today_button" type="button">
+                                <i class="material-icons">today</i>
+                            </button>
+                            <button class="btn btn-primary" id="next_button" type="button">
+                                    <i class="material-icons">arrow_forward</i>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div style="margin-top: 20px;">
                     <div>
                         <canvas id="chart_data"></canvas>
                     </div>
+                </div>
+                <div>
+                    <span style="margin-left:10px"></span>
+                    <span style="height: 10px;width: 10px;background-color: #4f73df;border-radius: 50%;display: inline-block;"></span>
+                    <span style="display: inline-block;margin-left: 5px;">Predicted</span>
+                    <span style="margin-left: 10px;"></span><span style="height: 10px;width: 10px;background-color: #f25a5a ;border-radius: 50%;display: inline-block;"></span>
+                    <span style="display: inline-block;margin-left: 5px;">Current</span>
                 </div>
             </div>
         </div>
