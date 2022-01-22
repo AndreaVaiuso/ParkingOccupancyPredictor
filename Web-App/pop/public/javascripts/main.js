@@ -37,7 +37,7 @@ function current(){
             current_date = (Number.parseInt(x[2])+2000) + "-" + x[1] + "-" + x[0]
             current_date = Date.parse(current_date)
             last_update.innerHTML=current_data["DATE"] + " - " + time
-            postPrediction({ "WEEK_DAY": wday, "WEEK_SHIFT": 0})
+            postPrediction({ "WEEKDAY": wday, "WEEK_SHIFT": 0})
         },
         error: function (xhr, status) {
             alert(status);
@@ -115,7 +115,7 @@ $("#back_button").click(function(e) {
         day_shift -= 1
         current_date = addDays(current_date,-1)
         current_day.innerHTML = current_date.getDate() + "/" + (current_date.getMonth() + 1) + "/" + current_date.getFullYear()
-        postPrediction({ "WEEK_DAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7)})
+        postPrediction({ "WEEKDAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7)})
     }
 });
 
@@ -128,7 +128,7 @@ $("#next_button").click(function(e) {
     current_date = addDays(current_date,1)
     current_day.innerHTML = current_date.getDate() + "/" + (current_date.getMonth() + 1) + "/" + current_date.getFullYear()
     document.getElementById("back_button").disabled = false
-    postPrediction({ "WEEK_DAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7)})
+    postPrediction({ "WEEKDAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7)})
 });
 
 current()

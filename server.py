@@ -9,7 +9,7 @@ from pydantic import BaseModel
 import json
 
 class Req(BaseModel):
-    WEEK_DAY: float
+    WEEKDAY: float
     WEEK_SHIFT: float
 
 app = FastAPI()
@@ -41,7 +41,7 @@ def read_current():
 @app.post("/predict")
 async def create_item(item: Req):
     global models, trends, look_back
-    index = int(item.WEEK_DAY)
+    index = int(item.WEEKDAY)
     week_shift = int(item.WEEK_SHIFT)
     if index not in range(7):
         return json.dumps({"status": "failed"})

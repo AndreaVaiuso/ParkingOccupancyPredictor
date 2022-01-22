@@ -20,7 +20,7 @@ SAMPLING_TIME = 3600
 LOOK_BACK = 3
 WEEKS_MEAN_NUMBER = 4
 
-DEBUG = True
+DEBUG = False
 
 def debug(string):
     if DEBUG: 
@@ -42,7 +42,7 @@ def create_dataset(dataset, look_back=1):
 def printRow(data):
     print(data['DATE'],data['WEEKDAY'],data['HOUR_OF_THE_DAY'],data['TOTAL_OCCUPIED_RATIO'])
 
-def getTrends(data_frame,weeks_number,week_day,look_back=0,samplingTime=3600,label_column="TOTAL_OCCUPIED_RATIO"):
+def getTrends(data_frame,weeks_number,week_day,look_back=0,samplingTime=3600,label_column="TOTAL_OCCUPIED_RATIO",verbose=False):
     i = -1
     week_day = str(week_day)
     last_day = data_frame[i]["WEEKDAY"]
@@ -63,7 +63,7 @@ def getTrends(data_frame,weeks_number,week_day,look_back=0,samplingTime=3600,lab
             try:
                 temp_tr.append(float(data_frame[j][label_column]))
             except IndexError:
-                print("Reached maximum week limit. Data truncated at value: "+str(week))
+                if verbose: print("Reached maximum week limit. Data truncated at value: "+str(week))
                 stop = True
                 break
         if stop: break
