@@ -197,6 +197,7 @@ def generate_model(df,weeks_train_number,week_day,look_back,force_train=False):
         model = do_train(history_trend,week_day,look_back)
     return model, history_trend
 
+
 def predict(model,trend_array,weeks_mean_number=WEEKS_MEAN_NUMBER,look_back=LOOK_BACK,weeks_shift=0,ground_truth=None):
     weights = generateWeights(weeks_mean_number)
     trend = trend_array
@@ -224,15 +225,46 @@ def predict(model,trend_array,weeks_mean_number=WEEKS_MEAN_NUMBER,look_back=LOOK
         mse = math.sqrt(mean_squared_error(ground_truth[0:len(ground_truth)][0], n_prediction[0:len(n_prediction)][0]))
     return prediction, mse
 
-def prepare(week_day):
-    df = ct.csv_open("DATASET/input.csv",sep=";")
+def prepare(week_day,poi_ID):
+    df = ct.csv_open("DATASET/POI_PARKING/"+str(poi_ID)+"/input.csv",sep=";")
     weeks_train_number = 21
     model, trend = generate_model(df,weeks_train_number,week_day=week_day,look_back=LOOK_BACK)
     return model, trend
 
+def getCurrent(poi_ID):
+    ds = ct.csv_open("DATASET/POI_PARKING/"+str(poi_ID)+"/current_day.csv")
+    date = str(ds[0]["DATE"])
+    resp = {}
+    resp["SAMPLING_TIME"] = 3600
+    resp["DATE"] = date
+    resp["WEEKDAY"] = str(ds[0]["WEEKDAY"])
+    for d in ds:
+        ext_hodd = d["HOUR_OF_THE_DAY"]
+        x = ext_hodd.strip().split(":")
+        hodd = x[0] + ":" + x[1] 
+        resp[hodd] = d["TOTAL_OCCUPIED_RATIO"]
+    jsonobj = json.dumps(resp)
+    return jsonobj
 
-def main(week_day):
-    df = ct.csv_open("DATASET/input.csv",sep=";")
+def makePrediction(index,week_shift,poi_ID):
+    if index not in range(7):
+        return json.dumps({"status": "failed"})
+    print("Request: ",index," Week_shift: ",week_shift," POI: ",poi_ID)
+    model,trend = prepare(index,poi_ID) 
+    prediction, _ = predict(model,trend,weeks_shift=week_shift)
+    pr = []
+    for pred in prediction:
+        pr.append(pred[0])
+    out = {}
+    t = 0
+    for pred in pr:
+        out[secToTime(t,clockFormat=True)] = str(pred)
+        t += SAMPLING_TIME
+    jsonobj = json.dumps(out)
+    return jsonobj
+
+def main(week_day,poi_ID):
+    df = ct.csv_open("DATASET/POI_PARKING/"+str(poi_ID)+"/input.csv",sep=";")
     weeks_train_number = 21
     look_back = 3
     model,trend = generate_model(df,weeks_train_number,week_day=week_day,look_back=look_back)
@@ -263,4 +295,4 @@ def main(week_day):
 
 if __name__ == "__main__":
     for i in range(7):
-        main(i)
+        main(i,24)

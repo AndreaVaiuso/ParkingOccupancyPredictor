@@ -1,0 +1,55 @@
+ID,semantic_flag,latitude,longitude,description,semantic_flag_description
+1,3,38.107284,13.352638,Segreteria centrale,Administration
+2,1,38.1067776,13.3521128,Mensa,Coffee Shop
+3,0,38.106122,13.351048,Dipartimento Ingegneria Informatica,Department
+4,0,38.105752,13.350345,Dipartimento Ingegneria Chimica,Department
+5,4,38.107728,13.353383,Parcheggio ingresso Orleans,Parking
+6,7,38.108292,13.353678,Ingresso Orleans,Entrance
+7,4,38.105387,13.350871,Parcheggio di fronte Ingegneria Chimica,Parking
+8,0,38.10428,13.349387,Polididattico,Department
+9,2,38.1041,13.348212,Parco di fronte Ingegneria,Recreational Place
+10,6,38.104602,13.349193,Aula magna Ingegneria,Ceremony Hall
+11,5,38.104936,13.348711,Biblioteca centrale Ingegneria,Library
+12,1,38.105194,13.348685,Bar di Ingegneria,Coffee Shop
+13,4,38.105113,13.348528,Parcheggio Ingegneria,Parking
+14,4,38.104676,13.347762,Parcheggio Ingegneria 2,Parking
+15,0,38.107591,13.352895,Facoltà di Agraria,Department
+16,0,38.102249,13.346985,Facoltà di Architettura,Department
+17,0,38.103073,13.347959,Facoltà di Economia,Department
+18,6,38.103516,13.348444,Aula magna Economia,Ceremony Hall
+19,0,38.102764,13.346447,Facoltà di Lettere,Department
+20,0,38.103686,13.346056,Dipartimento di Ingegneria Elettronica,Department
+21,0,38.104967,13.348061,Complesso centrale di Ingegneria,Department
+22,4,38.105507,13.34711,Parcheggio alle spalle del complesso di Ingegneria,Parking
+23,7,38.10572,13.35164,Ingresso mensa,Entrance
+24,7,38.103344,13.349042,Ingresso Economia,Entrance
+25,1,38.102804,13.346702,Bar di Lettere,Coffee Shop
+26,0,38.101964,13.345548,Facoltà di Scienze della formazione,Department
+27,7,38.100792,13.347172,Ingresso Biologia,Entrance
+28,0,38.100271,13.346037,Dipartimento di Biologia,Department
+29,0,38.099364,13.345154,Dipartimento di Chimica 1,Department
+30,0,38.098935,13.344719,Dipartimento di Chimica 2,Department
+31,0,38.098572,13.344389,Dipartimento di Fisica 1,Department
+32,0,38.098219,13.344113,Dipartimento di Fisica 2,Department
+33,1,38.099581,13.34536,Bar di Chimica,Coffee Shop
+34,4,38.0983873,13.3443345,Parcheggio Fisica,Parking
+35,4,38.099097,13.34491,Parcheggio Chimica,Parking
+36,4,38.100087,13.345862,Parcheggio Biologia,Parking
+37,4,38.103871,13.346658,Parcheggio Ingegneria Elettronica,Parking
+38,2,38.103119,13.346168,Parco di fronte Lettere,Recreational Place
+39,0,38.104327,13.347437,Dipartimento Ingegneria Gestionale,Department
+40,1,38.102249,13.346985,Bar di Architettura,Coffee Shop
+41,5,38.102249,13.346985,Biblioteca Architettura,Library
+42,5,38.102764,13.346447,Biblioteca Lettere,Library
+43,5,38.10249,13.345584,Biblioteca Wurth,Library
+44,5,38.105288,13.348436,Biblioteca Ingegneria edile ed Architettura,Library
+45,4,38.107934,13.351986,Parcheggio Agraria,Parking
+46,4,38.105634,13.349201,Parcheggio di fianco Ingegneria centrale,Parking
+47,2,38.106267,13.351421,Piazzetta di fianco Ingegneria Informatica,Recreational Place
+48,4,38.102535,13.347863,Parcheggio Economia,Parking
+49,2,38.10232,13.34549,Parco dietro Lettere,Recreational Place
+50,2,38.10186,13.34549,Parco di fronte Scienze della formazione,Recreational Place
+51,2,38.100361,13.344855,Piscina Fisica,Recreational Place
+52,2,38.100895,13.345423,Punto di ritrovo Biologia,Recreational Place
+53,4,38.10195,13.34599,Parcheggio di fronte Scienze della formazione,Parking
+54,3,38.102883,13.345544,Sistema Informativo d'Ateneo,Administration

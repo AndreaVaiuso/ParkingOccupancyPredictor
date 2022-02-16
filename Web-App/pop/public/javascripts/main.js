@@ -4,7 +4,10 @@ function addDays(date, days) {
     return result;
 }
 
+DEFAULT_POI_ID = 24
+selected_poi = DEFAULT_POI_ID
 addr = "http://127.0.0.1:5000"
+fidelity = ""
 current_data = {}
 current_date = ""
 wday = 0
@@ -17,9 +20,13 @@ chart = document.getElementById("chart")
 
 function current(){
     document.getElementById("back_button").disabled = true
+    rq = { "WEEKDAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7), "POI_ID": selected_poi}
     $.ajax({
         url: addr+'/current',
-        type: 'GET',
+        type: 'POST',
+        dataType: "json",
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify(rq),
         responseType:'json',
         crossDomain: true,
         success: function(response) {
@@ -37,7 +44,7 @@ function current(){
             current_date = (Number.parseInt(x[2])+2000) + "-" + x[1] + "-" + x[0]
             current_date = Date.parse(current_date)
             last_update.innerHTML=current_data["DATE"] + " - " + time
-            postPrediction({ "WEEKDAY": wday, "WEEK_SHIFT": 0})
+            postPrediction({ "WEEKDAY": wday, "WEEK_SHIFT": 0 ,"POI_ID": selected_poi})
         },
         error: function (xhr, status) {
             alert(status);
@@ -115,7 +122,7 @@ $("#back_button").click(function(e) {
         day_shift -= 1
         current_date = addDays(current_date,-1)
         current_day.innerHTML = current_date.getDate() + "/" + (current_date.getMonth() + 1) + "/" + current_date.getFullYear()
-        postPrediction({ "WEEKDAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7)})
+        postPrediction({ "WEEKDAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7), "POI_ID": selected_poi})
     }
 });
 
@@ -128,7 +135,7 @@ $("#next_button").click(function(e) {
     current_date = addDays(current_date,1)
     current_day.innerHTML = current_date.getDate() + "/" + (current_date.getMonth() + 1) + "/" + current_date.getFullYear()
     document.getElementById("back_button").disabled = false
-    postPrediction({ "WEEKDAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7)})
+    postPrediction({ "WEEKDAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7), "POI_ID": selected_poi})
 });
 
 current()
@@ -195,5 +202,13 @@ function updateBarGraph(chart, label, color, data) {
         data: data
     });
     chart.update();
+    week_shift = Math.floor(day_shift/7)
+    if(week_shift < 1){
+        document.getElementById("fidelity_field").innerHTML = "High fidelity"
+    } else if(week_shift >= 1 && week_shift < 2){
+        document.getElementById("fidelity_field").innerHTML = "Medium fidelity"
+    } else {
+        document.getElementById("fidelity_field").innerHTML = "Low fidelity"
+    }
 }
 
