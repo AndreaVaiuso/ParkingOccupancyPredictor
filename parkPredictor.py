@@ -153,19 +153,19 @@ def create_lstm(look_back):
     model.compile(loss='mean_squared_error', optimizer='adam')
     return model, early_stopping
 
-def do_train(history_trend,week_day,look_back):
+def do_train(history_trend,week_day,poi_ID,look_back):
     train = mergeData(history_trend,look_back)
     train = convertToColumn(train)
     trainX, trainY = create_dataset(train,look_back)
     trainX = numpy.reshape(trainX, (trainX.shape[0], 1, trainX.shape[1]))
     model, early_stopping = create_lstm(look_back)
-    model_f_name = "NETWORK/"+calendar.day_abbr[week_day]+".keras"
+    model_f_name = "NETWORK/"+str(poi_ID)+"/"+calendar.day_abbr[week_day]+".keras"
     model.fit(trainX, trainY, validation_split=0.3, epochs=100, batch_size=1, verbose=2, callbacks=[early_stopping])
     model.save(model_f_name)
     return model
 
-def load_model(week_day,look_back):
-    model_f_name = "NETWORK/"+calendar.day_abbr[week_day]+".keras"
+def load_model(week_day,poi_ID,look_back):
+    model_f_name = "NETWORK/"+str(poi_ID)+"/"+calendar.day_abbr[week_day]+".keras"
     model, _ = create_lstm(look_back)
     try:
         model.load_weights(model_f_name)
@@ -174,27 +174,27 @@ def load_model(week_day,look_back):
         return None
     return model
 
-def generate_models_array(df,weeks_train_number,look_back):
+def generate_models_array(df,weeks_train_number,poi_ID,look_back):
     models = []
     trends = []
     for week_day in range(7):
         history_trend = getTrends(df,weeks_train_number,week_day,look_back)
-        model = load_model(week_day,look_back)
+        model = load_model(week_day,poi_ID,look_back)
         if model is None:
-            model = do_train(history_trend,week_day,look_back)
+            model = do_train(history_trend,week_day,poi_ID,look_back)
         models.append(model)
         trends.append(history_trend)
     return models, trends
 
-def generate_model(df,weeks_train_number,week_day,look_back,force_train=False):
+def generate_model(df,weeks_train_number,poi_ID,week_day,look_back,force_train=False):
     history_trend = getTrends(df,weeks_train_number,week_day,look_back,samplingTime=SAMPLING_TIME)
     model = None
     if force_train:
-        model = do_train(history_trend,week_day,look_back)
+        model = do_train(history_trend,week_day,poi_ID,look_back)
         return model, history_trend
-    model = load_model(week_day,look_back)
+    model = load_model(week_day,poi_ID,look_back)
     if model is None:
-        model = do_train(history_trend,week_day,look_back)
+        model = do_train(history_trend,week_day,poi_ID,look_back)
     return model, history_trend
 
 
@@ -228,7 +228,7 @@ def predict(model,trend_array,weeks_mean_number=WEEKS_MEAN_NUMBER,look_back=LOOK
 def prepare(week_day,poi_ID):
     df = ct.csv_open("DATASET/POI_PARKING/"+str(poi_ID)+"/input.csv",sep=";")
     weeks_train_number = 21
-    model, trend = generate_model(df,weeks_train_number,week_day=week_day,look_back=LOOK_BACK)
+    model, trend = generate_model(df,weeks_train_number,poi_ID,week_day,LOOK_BACK)
     return model, trend
 
 def getCurrent(poi_ID):
@@ -267,7 +267,7 @@ def main(week_day,poi_ID):
     df = ct.csv_open("DATASET/POI_PARKING/"+str(poi_ID)+"/input.csv",sep=";")
     weeks_train_number = 21
     look_back = 3
-    model,trend = generate_model(df,weeks_train_number,week_day=week_day,look_back=look_back)
+    model,trend = generate_model(df,weeks_train_number,poi_ID,week_day=week_day,look_back=look_back)
     plt.xlim([0,23])
     plt.ylim([0,1])
     for i in range(4):
