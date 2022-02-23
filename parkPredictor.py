@@ -153,19 +153,19 @@ def create_lstm(look_back):
     model.compile(loss='mean_squared_error', optimizer='adam')
     return model, early_stopping
 
-def do_train(history_trend,week_day,poi_ID,look_back):
+def do_train(history_trend,week_day,pklot_ID,look_back):
     train = mergeData(history_trend,look_back)
     train = convertToColumn(train)
     trainX, trainY = create_dataset(train,look_back)
     trainX = numpy.reshape(trainX, (trainX.shape[0], 1, trainX.shape[1]))
     model, early_stopping = create_lstm(look_back)
-    model_f_name = "NETWORK/"+str(poi_ID)+"/"+calendar.day_abbr[week_day]+".keras"
+    model_f_name = "NETWORK/"+str(pklot_ID)+"/"+calendar.day_abbr[week_day]+".keras"
     model.fit(trainX, trainY, validation_split=0.3, epochs=100, batch_size=1, verbose=2, callbacks=[early_stopping])
     model.save(model_f_name)
     return model
 
-def load_model(week_day,poi_ID,look_back):
-    model_f_name = "NETWORK/"+str(poi_ID)+"/"+calendar.day_abbr[week_day]+".keras"
+def load_model(week_day,pklot_ID,look_back):
+    model_f_name = "NETWORK/"+str(pklot_ID)+"/"+calendar.day_abbr[week_day]+".keras"
     model, _ = create_lstm(look_back)
     try:
         model.load_weights(model_f_name)
@@ -174,27 +174,27 @@ def load_model(week_day,poi_ID,look_back):
         return None
     return model
 
-def generate_models_array(df,weeks_train_number,poi_ID,look_back):
+def generate_models_array(df,weeks_train_number,pklot_ID,look_back):
     models = []
     trends = []
     for week_day in range(7):
         history_trend = getTrends(df,weeks_train_number,week_day,look_back)
-        model = load_model(week_day,poi_ID,look_back)
+        model = load_model(week_day,pklot_ID,look_back)
         if model is None:
-            model = do_train(history_trend,week_day,poi_ID,look_back)
+            model = do_train(history_trend,week_day,pklot_ID,look_back)
         models.append(model)
         trends.append(history_trend)
     return models, trends
 
-def generate_model(df,weeks_train_number,poi_ID,week_day,look_back,force_train=False):
+def generate_model(df,weeks_train_number,pklot_ID,week_day,look_back,force_train=False):
     history_trend = getTrends(df,weeks_train_number,week_day,look_back,samplingTime=SAMPLING_TIME)
     model = None
     if force_train:
-        model = do_train(history_trend,week_day,poi_ID,look_back)
+        model = do_train(history_trend,week_day,pklot_ID,look_back)
         return model, history_trend
-    model = load_model(week_day,poi_ID,look_back)
+    model = load_model(week_day,pklot_ID,look_back)
     if model is None:
-        model = do_train(history_trend,week_day,poi_ID,look_back)
+        model = do_train(history_trend,week_day,pklot_ID,look_back)
     return model, history_trend
 
 
@@ -225,14 +225,14 @@ def predict(model,trend_array,weeks_mean_number=WEEKS_MEAN_NUMBER,look_back=LOOK
         mse = math.sqrt(mean_squared_error(ground_truth[0:len(ground_truth)][0], n_prediction[0:len(n_prediction)][0]))
     return prediction, mse
 
-def prepare(week_day,poi_ID):
-    df = ct.csv_open("DATASET/POI_PARKING/"+str(poi_ID)+"/input.csv",sep=";")
+def prepare(week_day,pklot_ID):
+    df = ct.csv_open("DATASET/PARKING_LOTS/"+str(pklot_ID)+"/history.csv",sep=";").getDataFrame()
     weeks_train_number = 21
-    model, trend = generate_model(df,weeks_train_number,poi_ID,week_day,LOOK_BACK)
+    model, trend = generate_model(df,weeks_train_number,pklot_ID,week_day,LOOK_BACK)
     return model, trend
 
-def getCurrent(poi_ID):
-    ds = ct.csv_open("DATASET/POI_PARKING/"+str(poi_ID)+"/current_day.csv")
+def getCurrent(pklot_ID):
+    ds = ct.csv_open("DATASET/PARKING_LOTS/"+str(pklot_ID)+"/current_day.csv").getDataFrame()
     date = str(ds[0]["DATE"])
     resp = {}
     resp["SAMPLING_TIME"] = 3600
@@ -246,11 +246,11 @@ def getCurrent(poi_ID):
     jsonobj = json.dumps(resp)
     return jsonobj
 
-def makePrediction(index,week_shift,poi_ID):
+def makePrediction(index,week_shift,pklot_ID):
     if index not in range(7):
         return json.dumps({"status": "failed"})
-    print("Request: ",index," Week_shift: ",week_shift," POI: ",poi_ID)
-    model,trend = prepare(index,poi_ID) 
+    print("Request: ",index," Week_shift: ",week_shift," POI: ",pklot_ID)
+    model,trend = prepare(index,pklot_ID) 
     prediction, _ = predict(model,trend,weeks_shift=week_shift)
     pr = []
     for pred in prediction:
@@ -263,11 +263,11 @@ def makePrediction(index,week_shift,poi_ID):
     jsonobj = json.dumps(out)
     return jsonobj
 
-def main(week_day,poi_ID):
-    df = ct.csv_open("DATASET/POI_PARKING/"+str(poi_ID)+"/input.csv",sep=";")
+def main(week_day,pklot_ID):
+    df = ct.csv_open("DATASET/PARKING_LOTS/"+str(pklot_ID)+"/history.csv",sep=";").getDataFrame()
     weeks_train_number = 21
     look_back = 3
-    model,trend = generate_model(df,weeks_train_number,poi_ID,week_day=week_day,look_back=look_back)
+    model,trend = generate_model(df,weeks_train_number,pklot_ID,week_day=week_day,look_back=look_back)
     plt.xlim([0,23])
     plt.ylim([0,1])
     for i in range(4):

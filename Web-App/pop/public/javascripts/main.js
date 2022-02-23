@@ -1,12 +1,14 @@
+port = 5000
+addr = "http://127.0.0.1:"+port
+
 function addDays(date, days) {
     var result = new Date(date);
     result.setDate(result.getDate() + days);
     return result;
 }
 
-DEFAULT_POI_ID = 24
-selected_poi = DEFAULT_POI_ID
-addr = "http://127.0.0.1:5000"
+DEFAULT_PKLOT_ID = 24
+selected_pklot = DEFAULT_PKLOT_ID
 fidelity = ""
 current_data = {}
 current_date = ""
@@ -20,7 +22,7 @@ chart = document.getElementById("chart")
 
 function current(){
     document.getElementById("back_button").disabled = true
-    rq = { "WEEKDAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7), "POI_ID": selected_poi}
+    rq = { "WEEKDAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7), "PKLOT_ID": selected_pklot}
     $.ajax({
         url: addr+'/current',
         type: 'POST',
@@ -44,7 +46,7 @@ function current(){
             current_date = (Number.parseInt(x[2])+2000) + "-" + x[1] + "-" + x[0]
             current_date = Date.parse(current_date)
             last_update.innerHTML=current_data["DATE"] + " - " + time
-            postPrediction({ "WEEKDAY": wday, "WEEK_SHIFT": 0 ,"POI_ID": selected_poi})
+            postPrediction({ "WEEKDAY": wday, "WEEK_SHIFT": 0 ,"PKLOT_ID": selected_pklot})
         },
         error: function (xhr, status) {
             alert(status);
@@ -122,7 +124,7 @@ $("#back_button").click(function(e) {
         day_shift -= 1
         current_date = addDays(current_date,-1)
         current_day.innerHTML = current_date.getDate() + "/" + (current_date.getMonth() + 1) + "/" + current_date.getFullYear()
-        postPrediction({ "WEEKDAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7), "POI_ID": selected_poi})
+        postPrediction({ "WEEKDAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7), "PKLOT_ID": selected_pklot})
     }
 });
 
@@ -135,7 +137,7 @@ $("#next_button").click(function(e) {
     current_date = addDays(current_date,1)
     current_day.innerHTML = current_date.getDate() + "/" + (current_date.getMonth() + 1) + "/" + current_date.getFullYear()
     document.getElementById("back_button").disabled = false
-    postPrediction({ "WEEKDAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7), "POI_ID": selected_poi})
+    postPrediction({ "WEEKDAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7), "PKLOT_ID": selected_pklot})
 });
 
 current()
