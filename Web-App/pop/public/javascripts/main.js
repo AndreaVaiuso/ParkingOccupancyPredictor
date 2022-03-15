@@ -1,12 +1,8 @@
 port = 5000
 addr = "http://127.0.0.1:"+port
-
-function addDays(date, days) {
-    var result = new Date(date);
-    result.setDate(result.getDate() + days);
-    return result;
-}
-
+current_method = "/api/smartep_ia/occupation/current"
+predict_method = "/api/smartep_ia/occupation/predict"
+aviable_pklots = [5,7,13,14,22,24,34,35,36,37,45,46,48,53]
 DEFAULT_PKLOT_ID = 24
 selected_pklot = DEFAULT_PKLOT_ID
 fidelity = ""
@@ -15,16 +11,22 @@ current_date = ""
 wday = 0
 day_shift = 0
 week_shift = 0
+
 last_update = document.getElementById("last_update")
 current_day = document.getElementById("current_day")
 chart = document.getElementById("chart")
 
+function addDays(date, days) {
+    var result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+}
 
 function current(){
     document.getElementById("back_button").disabled = true
     rq = { "WEEKDAY": (wday%7), "WEEK_SHIFT": Math.floor(day_shift/7), "PKLOT_ID": selected_pklot}
     $.ajax({
-        url: addr+'/current',
+        url: addr+current_method,
         type: 'POST',
         dataType: "json",
         contentType: "application/json; charset=utf-8",
@@ -32,7 +34,7 @@ function current(){
         responseType:'json',
         crossDomain: true,
         success: function(response) {
-            current_data = $.parseJSON(response)
+            current_data = response
             SAMPLING_TIME = Number.parseInt(current_data["SAMPLING_TIME"])
             wday = Number.parseInt(current_data["WEEKDAY"])
             count = Object.keys(current_data).length
@@ -62,7 +64,7 @@ function postPrediction(request){
         document.getElementById("back_button").disabled = false
     }
     $.ajax({
-        url: addr+'/predict',
+        url: addr+predict_method,
         type: 'POST',
         dataType: "json",
         contentType: "application/json; charset=utf-8",
@@ -71,7 +73,7 @@ function postPrediction(request){
         crossDomain: true,
         success: function(response) {
             if(today){
-                predicted_today = $.parseJSON(response)
+                predicted_today = response
                 end = Number.parseInt((3600) / SAMPLING_TIME) * 23
                 x = time.split(":")
                 idx = Number.parseInt(x[0])
@@ -90,7 +92,7 @@ function postPrediction(request){
                 }
                 updateChart(colors)
             } else {
-                current_data = $.parseJSON(response)
+                current_data = response
                 updateChart()
             }
         },
@@ -213,4 +215,24 @@ function updateBarGraph(chart, label, color, data) {
         document.getElementById("fidelity_field").innerHTML = "Low fidelity"
     }
 }
+
+drop_menu = document.getElementById("dropmenu")
+document.getElementById("dropmenushow").innerHTML = "Park "+selected_pklot
+for(i=0;i<aviable_pklots.length;i++){
+    ddname = 'dropmenu_'+aviable_pklots[i]
+    drop_menu.innerHTML += '<a id='+ddname+' role="presentation" class="dropdown-item" onClick="chgPark(this)">Park '+aviable_pklots[i]+'</a>'
+}
+
+function chgPark(elem){
+    nam = elem.id.split("_")
+    selected_pklot = nam[1]
+    current()
+    day_shift = 0
+    current_date = addDays(current_date,-wday)
+    wday = 0
+    current_day.innerHTML = "TODAY"
+    document.getElementById("back_button").disabled = true
+    document.getElementById("dropmenushow").innerHTML = "Park "+selected_pklot
+}
+
 

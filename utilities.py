@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 from skimage import transform
+import datetime
 import os
 import cv2
 import math
@@ -18,6 +19,13 @@ class bcolors:
 def darker(color):
     r,g,b,a = color
     return (r-50,g-50,b-50,a)
+
+def getDate(dt,sep="/"):
+  dtsep = dt.split(sep)
+  day = int(dtsep[0])
+  month = int(dtsep[1])
+  year = int(dtsep[2])
+  return datetime.datetime(year=year, month=month, day=day)
 
 def getFName(name):
     n = name.split(".")
@@ -57,7 +65,19 @@ def formatTime(time):
     return "0"+str(time)
   return str(time)
 
-def secToTime(n,clockFormat=False):
+def timeToSec(time:str):
+  try:
+    x = time.split(":")
+    h = int(x[0])
+    m = int(x[1])
+    if h >=24 or m >= 60:
+      raise ValueError("Not valid time")
+  except (ValueError,IndexError) as e:
+    raise ValueError()
+  secs = h * 3600 + m * 60
+  return secs
+
+def secToTime(n,clockFormat=False,hs=False):
     day = n // (24 * 3600)
     n = n % (24 * 3600)
     hour = n // 3600
@@ -65,7 +85,9 @@ def secToTime(n,clockFormat=False):
     minutes = n // 60
     n %= 60
     seconds = math.ceil(n)
-    if clockFormat: return formatTime(math.ceil(hour)) + ":" + formatTime(math.ceil(minutes))
+    if clockFormat: 
+      if hs: return formatTime(math.ceil(hour)) + "h " + formatTime(math.ceil(minutes)) + "m"
+      else: return formatTime(math.ceil(hour)) + ":" + formatTime(math.ceil(minutes))
     return formatTime(math.ceil(day))+"d:"+formatTime(math.ceil(hour))+"h:"+formatTime(math.ceil(minutes))+"m:"+formatTime(seconds)+"s"
 
 def imgpad(im,h,w):

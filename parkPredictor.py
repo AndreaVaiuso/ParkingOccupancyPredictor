@@ -12,7 +12,6 @@ from sklearn.metrics import mean_squared_error
 import sys
 import os
 import calendar
-import json
 
 SECONDS_IN_WEEK = 604800
 SECONDS_IN_DAY = 86400
@@ -225,10 +224,9 @@ def predict(model,trend_array,weeks_mean_number=WEEKS_MEAN_NUMBER,look_back=LOOK
         mse = math.sqrt(mean_squared_error(ground_truth[0:len(ground_truth)][0], n_prediction[0:len(n_prediction)][0]))
     return prediction, mse
 
-def prepare(week_day,pklot_ID):
-    df = ct.csv_open("DATASET/PARKING_LOTS/"+str(pklot_ID)+"/history.csv",sep=";").getDataFrame()
+def prepare(df,week_day,pklot_ID,force_train=False):
     weeks_train_number = 21
-    model, trend = generate_model(df,weeks_train_number,pklot_ID,week_day,LOOK_BACK)
+    model, trend = generate_model(df,weeks_train_number,pklot_ID,week_day,LOOK_BACK,force_train=force_train)
     return model, trend
 
 def getCurrent(pklot_ID):
@@ -243,56 +241,21 @@ def getCurrent(pklot_ID):
         x = ext_hodd.strip().split(":")
         hodd = x[0] + ":" + x[1] 
         resp[hodd] = d["TOTAL_OCCUPIED_RATIO"]
-    jsonobj = json.dumps(resp)
-    return jsonobj
+    return resp
 
-def makePrediction(index,week_shift,pklot_ID):
+def makePrediction(df,index,week_shift,pklot_ID,force_train=False):
     if index not in range(7):
-        return json.dumps({"status": "failed"})
-    print("Request: ",index," Week_shift: ",week_shift," POI: ",pklot_ID)
-    model,trend = prepare(index,pklot_ID) 
+        return {"status": "error","msg":"Invalid week day: '"+str(index)+"'"}
+    if week_shift > 4:
+        return {"status":"error","msg":"You cannot predict for more than 4 weeks in the future because prediction could result heavy unstable"}
+    model,trend = prepare(df,index,pklot_ID,force_train=force_train) 
     prediction, _ = predict(model,trend,weeks_shift=week_shift)
     pr = []
     for pred in prediction:
         pr.append(pred[0])
-    out = {}
+    resp = {}
     t = 0
     for pred in pr:
-        out[secToTime(t,clockFormat=True)] = str(pred)
+        resp[secToTime(t,clockFormat=True)] = str(pred)
         t += SAMPLING_TIME
-    jsonobj = json.dumps(out)
-    return jsonobj
-
-def main(week_day,pklot_ID):
-    df = ct.csv_open("DATASET/PARKING_LOTS/"+str(pklot_ID)+"/history.csv",sep=";").getDataFrame()
-    weeks_train_number = 21
-    look_back = 3
-    model,trend = generate_model(df,weeks_train_number,pklot_ID,week_day=week_day,look_back=look_back)
-    plt.xlim([0,23])
-    plt.ylim([0,1])
-    for i in range(4):
-        plt.plot(trend[i][look_back:len(trend[i])-look_back])
-    plt.show(block=False)
-    plt.pause(2)
-    plt.close()
-    prediction, mse = predict(model,trend,weeks_mean_number=4,look_back=look_back)
-    pr = []
-    for pred in prediction:
-        pr.append(pred[0])
-    out = {}
-    t = 0
-    for pred in pr:
-        out[secToTime(t,clockFormat=True)] = str(pred)
-        t += SAMPLING_TIME
-    json_object = json.dumps(out, indent = 4)
-    plt.xlim([0,23])
-    plt.ylim([0,1])
-    plt.plot(prediction,label="prediction")
-    plt.legend()
-    plt.show(block=False)
-    plt.pause(2)
-    plt.close() 
-
-if __name__ == "__main__":
-    for i in range(7):
-        main(i,24)
+    return resp
