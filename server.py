@@ -1,3 +1,4 @@
+from os import sep
 import sys
 from fastapi import FastAPI
 from parkPredictor import getCurrent, makePrediction, prepare
@@ -13,8 +14,10 @@ class EnVar(BaseSettings):
     ds: dict = {}
     def getDataSet(self,pklot_id):
         if pklot_id not in self.ds:
-            self.ds[pklot_id] = ct.csv_open("DATASET/PARKING_LOTS/"+str(pklot_id)+"/history.csv").getDataFrame()
+            self.ds[pklot_id] = ct.csv_open("DATASET/PARKING_LOTS/occupancy_park_"+str(pklot_id)+".csv",sep=",").getDataFrame()
         return self.ds[pklot_id]
+    def resetDataSet(self):
+        self.ds = {}
 
 
 class Req(BaseModel):
@@ -33,10 +36,10 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-@app.post("/api/smartep_ia/occupation/current")
-async def read_current(item: Req):
-    pklot_ID = int(item.PKLOT_ID)
-    return getCurrent(pklot_ID)
+@app.get("/api/smartep_ia/occupation/update_dataset")
+async def create_item():
+    enVar.resetDataSet()
+    return {"status":"ok","msg":"Dataset reset done"}
 
 @app.post("/api/smartep_ia/occupation/predict")
 async def create_item(item: Req):
@@ -50,7 +53,7 @@ async def create_item(item: Req):
     return makePrediction(df,index,week_shift,pklot_ID)
 
 def warmup():
-    aviable_pklots = [5,7,13,14,22,24,34,35,36,37,45,46,48,53]
+    aviable_pklots = [4,11,16,19,21,29,30,32,39]
     for pklot_ID in aviable_pklots:
         try:
             df = enVar.getDataSet(pklot_ID)
@@ -60,7 +63,7 @@ def warmup():
             continue
 
 if __name__ == "__main__":
-
+    # warmup()
     prt = 5000
     hst = "127.0.0.1"
     p = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
