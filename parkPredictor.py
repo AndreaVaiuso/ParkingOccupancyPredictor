@@ -2,6 +2,7 @@ import numpy
 import matplotlib.pyplot as plt
 from utilities import bcolors, secToTime
 import math
+import json
 import csvtools as ct
 import tensorflow as tf
 from keras.models import Sequential
@@ -9,13 +10,11 @@ from keras.layers import Dense
 from keras.layers import LSTM
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
-import sys
-import os
 import calendar
 
 SECONDS_IN_WEEK = 604800
 SECONDS_IN_DAY = 86400
-SAMPLING_TIME = 3600
+SAMPLING_TIME = 1800
 LOOK_BACK = 3
 WEEKS_MEAN_NUMBER = 4
 
@@ -39,18 +38,28 @@ def create_dataset(dataset, look_back=1):
 	return numpy.array(dataX), numpy.array(dataY)
 
 def printRow(data):
-    print(data['DATE'],data['WEEKDAY'],data['HOUR_OF_THE_DAY'],data['TOTAL_OCCUPIED_RATIO'])
+    print(data['park_id'],data['date'],data['weekday'],data['occupacy_percentage'])
 
-def getTrends(data_frame,weeks_number,week_day,look_back=0,samplingTime=3600,label_column="TOTAL_OCCUPIED_RATIO",verbose=False):
+def getWeekDayInteger(day:str) -> int:
+    d = day.lower()
+    if d.startswith("mon"): return 0
+    if d.startswith("tue"): return 1
+    if d.startswith("wed"): return 2
+    if d.startswith("thu"): return 3
+    if d.startswith("fri"): return 4
+    if d.startswith("sat"): return 5
+    if d.startswith("sun"): return 6
+
+def getTrends(data_frame,weeks_number,week_day,look_back=0,samplingTime=1800,label_column="occupacy_percentage",verbose=False):
     i = -1
     week_day = str(week_day)
-    last_day = data_frame[i]["WEEKDAY"]
+    last_day = getWeekDayInteger(data_frame[i]["weekday"])
     if week_day==last_day:
         i -= int(SECONDS_IN_WEEK / samplingTime) - int(SECONDS_IN_DAY/samplingTime)
     else:
         while True:
             i -= 1
-            if data_frame[i]["WEEKDAY"] == week_day:
+            if getWeekDayInteger(data_frame[i]["weekday"]) == int(week_day):
                 break
     trend = []
     stop = False
@@ -60,7 +69,9 @@ def getTrends(data_frame,weeks_number,week_day,look_back=0,samplingTime=3600,lab
         temp_tr = []
         for j in range(fr,to,-1):
             try:
-                temp_tr.append(float(data_frame[j][label_column]))
+                value = float(data_frame[j][label_column]) / 100
+                temp_tr.append(value)
+                # print(data_frame[j]["date"],data_frame[j]["weekday"],data_frame[j]["hour"],value)
             except IndexError:
                 if verbose: print("Reached maximum week limit. Data truncated at value: "+str(week))
                 stop = True
@@ -68,8 +79,9 @@ def getTrends(data_frame,weeks_number,week_day,look_back=0,samplingTime=3600,lab
         if stop: break
         trend.append(temp_tr)
         trend[-1].reverse()
-        i -= int(SECONDS_IN_DAY/samplingTime)
-        i -= int(SECONDS_IN_WEEK / samplingTime) - int(SECONDS_IN_DAY/samplingTime)
+        i -= int(SECONDS_IN_DAY / samplingTime)
+        i -= int(SECONDS_IN_WEEK / samplingTime) - int(SECONDS_IN_DAY / samplingTime)
+        # print("")
     return trend
 
 def mergeData(trend,look_back=0):
@@ -173,18 +185,6 @@ def load_model(week_day,pklot_ID,look_back):
         return None
     return model
 
-def generate_models_array(df,weeks_train_number,pklot_ID,look_back):
-    models = []
-    trends = []
-    for week_day in range(7):
-        history_trend = getTrends(df,weeks_train_number,week_day,look_back)
-        model = load_model(week_day,pklot_ID,look_back)
-        if model is None:
-            model = do_train(history_trend,week_day,pklot_ID,look_back)
-        models.append(model)
-        trends.append(history_trend)
-    return models, trends
-
 def generate_model(df,weeks_train_number,pklot_ID,week_day,look_back,force_train=False):
     history_trend = getTrends(df,weeks_train_number,week_day,look_back,samplingTime=SAMPLING_TIME)
     model = None
@@ -196,7 +196,6 @@ def generate_model(df,weeks_train_number,pklot_ID,week_day,look_back,force_train
         model = do_train(history_trend,week_day,pklot_ID,look_back)
     return model, history_trend
 
-
 def predict(model,trend_array,weeks_mean_number=WEEKS_MEAN_NUMBER,look_back=LOOK_BACK,weeks_shift=0,ground_truth=None):
     weights = generateWeights(weeks_mean_number)
     trend = trend_array
@@ -206,17 +205,19 @@ def predict(model,trend_array,weeks_mean_number=WEEKS_MEAN_NUMBER,look_back=LOOK
         n = len(trend)
         w_set = weightedMean(trend[n-weeks_mean_number:n],weights)
         pad_head = w_set[0:look_back]
-        pad_teal = w_set[-1]
+        pad_tail = w_set[-1]
         w_set = convertToColumn(w_set)
         testX, _ = create_dataset(w_set,look_back)
         testX = numpy.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
         n_prediction = model.predict(testX)
+        for idx in range(len(n_prediction)):
+            if n_prediction[idx][0] < 0: n_prediction[idx][0] = 0
         n_prediction = padding(n_prediction,look_back)
         for i in range(len(n_prediction)):
             val = n_prediction[i][0]
             if not numpy.isnan(val):
                 pad_head.append(val)
-        pad_head.append(pad_teal)
+        pad_head.append(pad_tail)
         trend.append(pad_head)
     prediction = n_prediction[look_back:len(n_prediction)-look_back+1]
     if ground_truth is not None:
@@ -230,17 +231,18 @@ def prepare(df,week_day,pklot_ID,force_train=False):
     return model, trend
 
 def getCurrent(pklot_ID):
+    global SAMPLING_TIME
     ds = ct.csv_open("DATASET/PARKING_LOTS/"+str(pklot_ID)+"/current_day.csv").getDataFrame()
-    date = str(ds[0]["DATE"])
+    date = str(ds[0]["date"])
     resp = {}
-    resp["SAMPLING_TIME"] = 3600
+    resp["SAMPLING_TIME"] = SAMPLING_TIME
     resp["DATE"] = date
-    resp["WEEKDAY"] = str(ds[0]["WEEKDAY"])
+    resp["WEEKDAY"] = str(ds[0]["weekday"])
     for d in ds:
-        ext_hodd = d["HOUR_OF_THE_DAY"]
+        ext_hodd = d["hour"]
         x = ext_hodd.strip().split(":")
         hodd = x[0] + ":" + x[1] 
-        resp[hodd] = d["TOTAL_OCCUPIED_RATIO"]
+        resp[hodd] = d["occupacy_percentage"]
     return resp
 
 def makePrediction(df,index,week_shift,pklot_ID,force_train=False):
@@ -259,3 +261,37 @@ def makePrediction(df,index,week_shift,pklot_ID,force_train=False):
         resp[secToTime(t,clockFormat=True)] = str(pred)
         t += SAMPLING_TIME
     return resp
+
+def main(week_day, pklot_ID):
+    print("Starting TEST for day: ",week_day," in parking: ", pklot_ID)
+    df = ct.csv_open("DATASET/PARKING_LOTS/occupancy_park_"+str(pklot_ID)+".csv",sep=",").getDataFrame()
+    weeks_train_number = 21
+    look_back = 6
+    model,trend = generate_model(df,weeks_train_number,pklot_ID,week_day=week_day,look_back=look_back)
+    plt.xlim([0,46])
+    plt.ylim([0,1])
+    for i in range(21):
+        print(trend[i][look_back:len(trend[i])-look_back])
+        plt.plot(trend[i][look_back:len(trend[i])-look_back],label="week -"+str(i))
+    plt.legend()
+    plt.show(block=True)
+    plt.close()
+    prediction, mse = predict(model,trend,weeks_mean_number=4,look_back=look_back,weeks_shift=3)
+    pr = []
+    for pred in prediction:
+        pr.append(pred[0])
+    out = {}
+    t = 0
+    for pred in pr:
+        out[secToTime(t,clockFormat=True)] = str(pred)
+        t += SAMPLING_TIME
+    json_object = json.dumps(out, indent = 4)
+    plt.xlim([0,46])
+    plt.ylim([0,1])
+    plt.plot(prediction,label="prediction")
+    plt.legend()
+    plt.show(block=True)
+    plt.close() 
+
+if __name__ == "__main__":
+        main(2,11)
