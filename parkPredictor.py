@@ -71,6 +71,7 @@ def getTrends(data_frame,weeks_number,week_day,look_back=0,samplingTime=1800,lab
             try:
                 value = float(data_frame[j][label_column]) / 100
                 temp_tr.append(value)
+                # print(data_frame[j]["date"],data_frame[j]["weekday"],data_frame[j]["hour"],value)
             except IndexError:
                 if verbose: print("Reached maximum week limit. Data truncated at value: "+str(week))
                 stop = True
@@ -80,6 +81,7 @@ def getTrends(data_frame,weeks_number,week_day,look_back=0,samplingTime=1800,lab
         trend[-1].reverse()
         i -= int(SECONDS_IN_DAY / samplingTime)
         i -= int(SECONDS_IN_WEEK / samplingTime) - int(SECONDS_IN_DAY / samplingTime)
+        # print("")
     return trend
 
 def mergeData(trend,look_back=0):
@@ -292,4 +294,4 @@ def main(week_day, pklot_ID):
     plt.close() 
 
 if __name__ == "__main__":
-        main(1,11)
+        main(2,11)

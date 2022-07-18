@@ -63,7 +63,7 @@ def warmup():
             continue
 
 if __name__ == "__main__":
-    # warmup()
+    warmup()
     prt = 5000
     hst = "127.0.0.1"
     p = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
